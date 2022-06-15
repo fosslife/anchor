@@ -2,16 +2,16 @@ import {
   Box,
   Button,
   createStyles,
+  Modal,
   MultiSelect,
   Navbar,
   Text,
   TextInput,
 } from "@mantine/core";
-import { useForm } from "@mantine/form";
-import { useModals } from "@mantine/modals";
+import axios from "axios";
 import type { NextPage } from "next";
+import { useEffect } from "react";
 import { FormEventHandler, useState } from "react";
-import { db } from "../utils/db";
 
 const useStyles = createStyles({
   navbarContainer: {
@@ -31,69 +31,25 @@ const useStyles = createStyles({
 
 const Home: NextPage = (props) => {
   const { classes } = useStyles();
-  const modals = useModals();
 
   const [link, setLink] = useState("");
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [searchTags, setSearchTags] = useState([]);
+  const [opened, setOpened] = useState(false);
 
-  const handleSubmit: FormEventHandler<HTMLFormElement> = (e) => {
+  const handleSubmit: FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
-    // modals.closeModal(id);
-    console.log("Submit", link, title, tags);
+    const res = await axios.post("/api/link", { title, link, tags });
+    console.log(res.data);
   };
 
-  const openAddModal = () => {
-    const id = modals.openModal({
-      title: "Add new link",
-      children: (
-        <form onSubmit={handleSubmit}>
-          <TextInput
-            onChange={(e) => {
-              console.log(e.target.value);
-              setLink(e.target.value);
-            }}
-            required
-            placeholder="Enter Link"
-            label="Link"
-            mt="md"
-          ></TextInput>
-          <TextInput
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Enter Title"
-            label="Title"
-            mt="md"
-          ></TextInput>
-          <MultiSelect
-            mt="md"
-            data={[]}
-            placeholder="Select tags"
-            label="tags"
-            maxSelectedValues={4}
-            searchable
-            clearable
-            creatable
-            getCreateLabel={(e) => `+ New Tag ${e}`}
-            onChange={(e) => {
-              // TODO: store in db
-              setTags(e);
-            }}
-          />
-          <Button
-            type="submit"
-            fullWidth
-            mt="xl"
-            onClick={() => {
-              modals.closeModal(id);
-              console.log("Click", link, title, tags);
-            }}
-          >
-            Save
-          </Button>
-        </form>
-      ),
+  useEffect(() => {
+    axios.get("/api/tags").then(({ data }) => {
+      setSearchTags(data);
     });
-  };
+  }, []);
+
   return (
     <div>
       <Navbar className={classes.navbarContainer}>
@@ -109,11 +65,62 @@ const Home: NextPage = (props) => {
           ></TextInput>
         </Navbar.Section>
         <Navbar.Section>
-          <Button variant="light" radius={"md"} onClick={openAddModal}>
+          <Button variant="light" radius={"md"} onClick={() => setOpened(true)}>
             +
           </Button>
         </Navbar.Section>
       </Navbar>
+
+      {/* MODAL */}
+      <Modal
+        opened={opened}
+        onClose={() => setOpened(false)}
+        title="Add New Link"
+      >
+        <form onSubmit={handleSubmit}>
+          <TextInput
+            onChange={(e) => setLink(e.target.value)}
+            required
+            placeholder="Enter Link"
+            label="Link"
+            mt="md"
+          ></TextInput>
+          <TextInput
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Enter Title"
+            label="Title"
+            mt="md"
+          ></TextInput>
+          <MultiSelect
+            mt="md"
+            data={searchTags}
+            placeholder="Select tags"
+            label="tags"
+            limit={10}
+            maxSelectedValues={4}
+            searchable
+            clearable
+            creatable
+            getCreateLabel={(e) => `+ Create New Tag \`${e}\``}
+            onCreate={(e) => {
+              console.log("e", e);
+              axios.post("/api/tags", { tag: e });
+            }}
+            onSearchChange={async (e) => {
+              let { data } = await axios.get("/api/tags", {
+                params: { q: e },
+              });
+              setSearchTags(data);
+            }}
+            // onChange
+          />
+          <Button type="submit" fullWidth mt="xl">
+            Save
+          </Button>
+        </form>
+      </Modal>
+
+      {/*  */}
     </div>
   );
 };
